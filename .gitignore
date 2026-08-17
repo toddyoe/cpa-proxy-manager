@@ -1,0 +1,26 @@
+# 构建产物
+*.exe
+*.dll
+*.so
+*.dylib
+dist/
+build/
+
+# 依赖与缓存
+node_modules/
+.gocache/
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# 本地临时
+*.local
+*.tmp
+
+# IDE
+.idea/
+.vscode/
+
+# 本地助手配置
+.claude/

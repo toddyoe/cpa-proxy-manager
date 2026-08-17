@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>代理批量设置</title>
+<style>
+:root{
+  --bg:#faf9f5;
+  --panel:#f0eee8;
+  --surface:#fffdf9;
+  --hover:#f6f4ee;
+  --ink:#2d2a26;
+  --ink-2:#6d6760;
+  --ink-3:#a29c95;
+  --line:#e3e1db;
+  --line-2:#d5d2cb;
+  --amber:#d97706;
+  --coral:#c65746;
+  --green:#10b981;
+  --action:#8b8680;
+  --action-deep:#7f7a74;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Roboto","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5}
+button{font-family:inherit;font-size:inherit;cursor:pointer}
+input,select{font-family:inherit;font-size:inherit;color:var(--ink)}
+:focus-visible{outline:2px solid var(--action);outline-offset:2px;border-radius:2px}
+button:disabled,select:disabled{opacity:.45;cursor:not-allowed}
+
+/* 顶栏 */
+.top{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{font-size:17px;font-weight:600;letter-spacing:.5px;color:var(--ink)}
+.top .grow{flex:1}
+.btn-ghost{background:transparent;border:1px solid var(--line-2);color:var(--ink-2);border-radius:6px;padding:5px 12px}
+.btn-ghost:hover{background:var(--panel);border-color:var(--action)}
+
+/* 小按钮 */
+.btn-sm{background:var(--surface);border:1px solid var(--line-2);color:var(--ink-2);border-radius:4px;padding:4px 12px}
+.btn-sm:hover{border-color:var(--action);color:var(--action)}
+.btn-sm.primary{background:var(--action);border-color:var(--action);color:#fff}
+.btn-sm.primary:hover{background:var(--action-deep)}
+.btn-sm.danger{color:var(--coral)}
+.btn-sm.danger:hover{border-color:var(--coral)}
+
+/* 模板管理弹层 */
+.mtpl h3{font-size:13px;font-weight:600;margin:16px 0 8px;color:var(--ink)}
+.mtpl table{width:100%;border-collapse:collapse}
+.mtpl th{font-size:11px;font-weight:600;color:var(--ink-2);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line-2)}
+.mtpl td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.mtpl input{width:100%;border:1px solid var(--line-2);border-radius:4px;padding:6px 8px;background:var(--surface)}
+.mtpl input:focus{border-color:var(--action);outline:none}
+.mtpl input.invalid{border-color:var(--coral);background:rgba(198,87,70,.08)}
+.mtpl td.name{width:160px}
+.mtpl td.op{width:116px}
+.mtpl .opbtns{display:flex;gap:4px}
+.mtpl .opbtns .btn-sm{padding:4px 8px}
+.mtpl td.ph-name{width:150px}
+.mtpl td.ph-path{width:280px}
+.mtpl .builtin{color:var(--ink-3);font-size:12px}
+.mtpl .hint{font-size:12px;color:var(--ink-3);font-family:var(--mono);margin:10px 0 0}
+.mtpl .hint code{background:var(--panel);border-radius:3px;padding:0 4px;color:var(--ink-2)}
+.mtpl .conc{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;color:var(--ink-2)}
+.mtpl .conc input{width:70px;text-align:center;font-family:var(--mono)}
+
+/* 工具行 */
+.wrap{max-width:1280px;margin:0 auto;padding:0 22px 90px}
+.toolbar{display:flex;gap:10px;align-items:center;padding:16px 0 10px;flex-wrap:wrap}
+.toolbar input[type=search]{flex:1;min-width:200px;max-width:380px;background:var(--panel);border:1px solid var(--line-2);border-radius:4px;padding:7px 12px}
+.toolbar input[type=search]:focus{border-color:var(--action);outline:none}
+.toolbar select{background:var(--panel);border:1px solid var(--line-2);border-radius:4px;padding:7px 10px}
+.toolbar .vsep{width:1px;height:22px;background:var(--line-2);margin:0 4px}
+.toolbar .tpl-pick{font-size:13px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.toolbar select#tplSel{min-width:170px;font-weight:500}
+.toolbar .result{margin-left:auto;font-size:12px;color:var(--ink-3);font-family:var(--mono)}
+
+/* 账号表 */
+.tablewrap{background:var(--surface);border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+table.creds{width:100%;border-collapse:collapse}
+.creds th{font-size:12px;font-weight:600;color:var(--ink-2);text-align:left;padding:9px 14px;border-bottom:1px solid var(--line-2);background:var(--panel);white-space:nowrap}
+.creds td{padding:8px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+.creds tr:last-child td{border-bottom:none}
+.creds tbody tr:hover{background:var(--hover)}
+.cred-name{font-weight:500}
+.cred-sub{font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+td.mono,.mono{font-family:var(--mono);font-size:12px}
+td.url{max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2)}
+td.url.none{color:var(--ink-3)}
+input[type=checkbox]{width:15px;height:15px;accent-color:var(--action);cursor:pointer}
+input[type=checkbox]:disabled{cursor:not-allowed;opacity:.4}
+
+.empty{padding:46px 0;text-align:center;color:var(--ink-3)}
+.empty .btn-line{background:none;border:none;color:var(--action);text-decoration:underline;font-size:13px}
+
+/* 表脚 */
+.tfoot{display:flex;align-items:center;gap:16px;padding:12px 2px;flex-wrap:wrap}
+.pager{margin-left:auto;display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.pager .pages{display:flex;gap:4px;align-items:center}
+.pager button{background:var(--surface);border:1px solid var(--line-2);border-radius:4px;min-width:26px;height:26px;font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.pager button.cur{background:var(--action);border-color:var(--action);color:#fff;font-weight:600}
+.pager button:hover:not(.cur):not(:disabled){border-color:var(--action);color:var(--action)}
+.pager button:disabled{opacity:.35;cursor:default}
+.pager select{border:1px solid var(--line-2);border-radius:4px;padding:3px 6px;font-family:var(--mono);font-size:12px;background:var(--surface)}
+.pager .ellipsis{color:var(--ink-3);letter-spacing:1px}
+
+/* 底部操作栏 */
+.actionbar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);color:var(--ink);padding:10px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;z-index:40;box-shadow:0 -4px 14px rgba(45,42,38,.08)}
+.actionbar .sel{font-size:13px}
+.actionbar .sel b{font-family:var(--mono);color:var(--action-deep)}
+.actionbar .grow{flex:1}
+.btn-major{background:transparent;border:1px solid var(--line-2);color:var(--ink-2);border-radius:6px;padding:7px 18px;font-weight:500}
+.btn-major:hover:not(:disabled){background:var(--panel);border-color:var(--action)}
+.btn-major.go{background:var(--action);border-color:var(--action);color:#fff;font-weight:600}
+.btn-major.go:hover:not(:disabled){background:var(--action-deep)}
+.btn-major:disabled{opacity:.4;cursor:not-allowed}
+.btn-major.stop{border-color:var(--coral);color:var(--coral)}
+.btn-major.stop:hover{background:rgba(198,87,70,.08);border-color:var(--coral)}
+.prog{display:flex;align-items:center;gap:14px;flex:1;min-width:280px}
+.prog .bar{flex:1;height:6px;background:var(--panel);border-radius:3px;overflow:hidden}
+.prog .bar i{display:block;height:100%;background:var(--action);width:0;transition:width .15s}
+.prog .nums{font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--ink-2)}
+.fails{font-size:12px;color:var(--coral);font-family:var(--mono);max-height:52px;overflow:auto;line-height:1.7}
+.fails b{color:var(--ink)}
+
+/* 弹层 */
+.overlay{position:fixed;inset:0;background:rgba(45,42,38,.35);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:8px;max-width:960px;width:100%;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(45,42,38,.22)}
+.modal.small{max-width:460px}
+.modal header{padding:14px 18px;border-bottom:1px solid var(--line-2);font-weight:600;display:flex;align-items:center;gap:10px}
+.modal header .sub{font-weight:400;font-size:12px;color:var(--ink-3);font-family:var(--mono)}
+.modal .body{padding:16px 18px;overflow:auto;flex:1}
+.modal footer{padding:12px 18px;border-top:1px solid var(--line-2);display:flex;justify-content:flex-end;gap:10px;align-items:center}
+.pv-summary{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin-bottom:12px;border:1px solid var(--line);border-radius:6px;padding:8px 12px;background:var(--panel)}
+.pv-summary b{font-family:var(--mono)}
+table.pv{width:100%;border-collapse:collapse}
+.pv th{background:var(--panel);font-size:11px;font-weight:600;color:var(--ink-2);text-align:left;padding:7px 10px;border-bottom:1px solid var(--line-2)}
+.pv td{padding:6px 10px;border-bottom:1px solid var(--line);font-size:12px;font-family:var(--mono);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv td.cred{font-family:var(--sans);font-weight:500}
+.confirm-list{font-size:13px;color:var(--ink-2);line-height:2}
+.confirm-list b{font-family:var(--mono)}
+
+#toasts{position:fixed;top:16px;right:16px;z-index:70;display:flex;flex-direction:column;gap:8px}
+.toast{background:#2d2a26;color:#f6f4f1;border-left:3px solid var(--green);border-radius:4px;padding:9px 14px;font-size:13px;box-shadow:0 6px 18px rgba(45,42,38,.25)}
+.toast.warn{border-left-color:var(--amber)}
+.toast.err{border-left-color:var(--coral)}
+
+@media (max-width:760px){
+  .wrap{padding:0 12px 120px}
+  .top,.actionbar{padding-left:12px;padding-right:12px}
+  td.url{max-width:150px}
+  .toolbar .result{margin-left:0;width:100%}
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><h1 data-i18n="title">代理批量设置</h1></div>
+  <div class="grow"></div>
+  <button class="btn-ghost" id="refreshBtn" data-i18n="refresh">刷新</button>
+</div>
+
+<div class="wrap">
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="搜索账号 / 文件名" aria-label="搜索账号">
+    <select id="providerSel" aria-label="按类型筛选"></select>
+    <span class="vsep"></span>
+    <label class="tpl-pick" for="tplSel" data-i18n="tpl_pick">代理模板</label>
+    <select id="tplSel" aria-label="选择代理模板"></select>
+    <button class="btn-sm" id="tplManageBtn" data-i18n="tpl_manage">模板管理</button>
+    <span class="result" id="resultInfo"></span>
+  </div>
+
+  <div class="tablewrap">
+    <table class="creds">
+      <thead>
+        <tr>
+          <th style="width:34px"><input type="checkbox" id="checkAll" aria-label="全选当前筛选结果"></th>
+          <th data-i18n="col_account">账号</th>
+          <th style="width:90px" data-i18n="col_type">类型</th>
+          <th data-i18n="col_current">当前代理</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden>
+      <span data-i18n="empty_text">未找到匹配的账号</span> <button class="btn-line" id="clearFilter" data-i18n="clear_filter">清除筛选</button>
+    </div>
+  </div>
+
+  <div class="tfoot" id="tfoot">
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+
+<div class="actionbar" id="actionbar">
+  <span class="sel" id="selInfo">已选 <b>0</b> 项</span>
+  <div class="grow"></div>
+  <div id="progressZone" hidden style="display:flex;align-items:center;gap:14px;flex:1;min-width:280px"></div>
+  <span id="failZone" class="fails" hidden></span>
+  <button class="btn-major" id="previewBtn" title="预览当前筛选结果（与勾选无关）" data-i18n="preview">预览</button>
+  <button class="btn-major go" id="applyBtn" disabled data-i18n="apply">批量设置</button>
+  <button class="btn-major stop" id="clearBtn" disabled title="清空勾选账号的代理地址" data-i18n="clear">清空代理</button>
+  <button class="btn-major stop" id="stopBtn" hidden data-i18n="stop">停止</button>
+</div>
+
+<!-- 预览弹层 -->
+<div class="overlay" id="pvOverlay" role="dialog" aria-modal="true" aria-label="预览">
+  <div class="modal">
+    <header><span data-i18n="pv_title">预览</span> <span class="sub" data-i18n="pv_sub">只读 · 当前值与设置后对比</span></header>
+    <div class="body">
+      <div class="pv-summary" id="pvSummary"></div>
+      <table class="pv">
+        <thead><tr><th data-i18n="col_account">账号</th><th data-i18n="col_type">类型</th><th data-i18n="col_current">当前值</th><th data-i18n="col_after">设置后</th></tr></thead>
+        <tbody id="pvBody"></tbody>
+      </table>
+    </div>
+    <footer>
+      <div class="pager" id="pvPager" style="margin-right:auto"></div>
+      <button class="btn-sm" id="pvClose" data-i18n="close">关闭</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 确认弹层 -->
+<div class="overlay" id="cfOverlay" role="dialog" aria-modal="true" aria-label="确认批量操作">
+  <div class="modal small">
+    <header id="cfTitle">确认批量设置</header>
+    <div class="body"><div class="confirm-list" id="cfBody"></div></div>
+    <footer>
+      <button class="btn-sm" data-close="cfOverlay" data-i18n="cancel">取消</button>
+      <button class="btn-sm primary" id="cfGo">确认批量设置</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 模板管理弹层 -->
+<div class="overlay" id="mtOverlay" role="dialog" aria-modal="true" aria-label="模板管理">
+  <div class="modal">
+    <header data-i18n="tpl_manage">模板管理</header>
+    <div class="body mtpl">
+      <h3 data-i18n="tpl_section">模板</h3>
+      <table>
+        <thead><tr><th style="width:160px" data-i18n="col_tpl_name">名称</th><th data-i18n="col_tpl_url">代理地址模板</th><th style="width:60px"></th></tr></thead>
+        <tbody id="mtBody"></tbody>
+      </table>
+      <button class="btn-sm" id="mtAdd" style="margin-top:10px" data-i18n="tpl_add">+ 新增模板</button>
+      <h3><span data-i18n="ph_section">自定义占位符</span> <span class="builtin" data-i18n="ph_sub">从认证文件 JSON 提取</span></h3>
+      <table>
+        <thead><tr><th style="width:150px" data-i18n="col_ph_name">占位符</th><th style="width:280px">点路径</th><th data-i18n="col_ph_sample">示例值（按首个匹配账号试算）</th><th style="width:116px"></th></tr></thead>
+        <tbody id="phBody"></tbody>
+      </table>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn-sm" id="phAdd" data-i18n="ph_add">+ 新增占位符</button>
+        <button class="btn-sm danger" id="phReset" data-i18n="ph_reset">清空占位符</button>
+      </div>
+      <div class="conc">
+        <label for="concInput" data-i18n="conc_label">写入并发数</label>
+        <input type="number" id="concInput" min="1" max="64">
+        <span class="builtin" data-i18n="conc_hint">1–64，默认 8</span>
+      </div>
+      <p class="hint">内置：<code>{account}</code> 邮箱前缀 · <code>{email}</code> 完整邮箱 · <code>{provider}</code> 账号类型。自定义占位符按点路径（如 <code>$.organization_uuid</code>，数组用数字下标）从认证文件 JSON 取标量值；与内置同名时自定义优先。先点击聚焦某个模板地址输入框，再点「插入」，占位符会写入光标处。占位符取不到值或渲染出的地址不合法时，该账号会被跳过，执行时计入跳过数。</p>
+    </div>
+    <footer><button class="btn-sm" id="mtClose" data-i18n="close">关闭</button></footer>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+'use strict';
+/* ================= i18n（单一中文语言包） ================= */
+const I18N = {
+  title:'代理批量设置', refresh:'刷新', tpl_pick:'代理模板', tpl_manage:'模板管理',
+  all_types:'全部类型',
+  col_account:'账号', col_type:'类型', col_current:'当前代理', col_after:'设置后',
+  empty_text:'未找到匹配的账号', clear_filter:'清除筛选',
+  preview:'预览', apply:'批量设置', clear:'清空代理', stop:'停止',
+  pv_title:'预览', pv_sub:'只读 · 当前值与设置后对比', close:'关闭', cancel:'取消',
+  tpl_section:'模板', ph_section:'自定义占位符', ph_sub:'从认证文件 JSON 提取',
+  col_tpl_name:'名称', col_tpl_url:'代理地址模板', col_ph_name:'占位符', col_ph_sample:'示例值（按首个匹配账号试算）',
+  tpl_add:'+ 新增模板', ph_add:'+ 新增占位符', ph_reset:'清空占位符',
+  conc_label:'写入并发数', conc_hint:'1–64，默认 8',
+  load_fail:'加载失败', reloaded:'已重新加载', tpl_switched:'已切换模板',
+  not_set:'未设置', read_fail:'读取失败', loading:'加载中…',
+  skip_ph:'占位符无法解析', skip_url:'渲染出的地址不合法', skip_empty:'模板地址为空', skip_generic:'无法套用当前模板',
+  select_first:'请先勾选账号或全选', unit_accounts:' 个',
+  confirm_set_title:'确认批量设置', confirm_clear_title:'确认批量清空',
+  confirm_set_go:'确认批量设置', confirm_clear_go:'确认批量清空',
+  confirm_set_line_1:'将写入代理地址的账号', confirm_clear_line_1:'将清空代理地址的账号',
+  confirm_skip_line:'跳过', confirm_clear_note:'，清空后回退到全局代理（未配置则直连）。',
+  apply_started:'已开始执行', stopping:'正在停止…', stopped:'已停止', done:'执行完成',
+  fail_detail:'失败明细：', none_selectable:'所选账号均无法套用模板（占位符无法解析）',
+  none_clearable:'所选账号均未设置代理，无需清空', locked:'执行中已锁定',
+  saved:'配置已保存', save_fail:'保存失败', ph_deleted:'占位符已删除', tpl_deleted:'模板已删除',
+  ph_restored:'已清空自定义占位符', confirm_tpl_del:'删除模板', confirm_ph_reset:'将清空所有自定义占位符。确定？',
+  at_least_one_tpl:'至少保留一个模板', cursor_first:'请先将光标定位到要插入的模板输入框',
+  filter_total:'共', filter_unit:'条', page_of:' / '
+};
+function t(k){ return I18N[k] || k; }
+
+/* ================= API ================= */
+const API = '/v0/management/plugins/cpa-proxy-manager';
+// 注意：配置路由用 /settings —— 宿主内置路由 /plugins/:id/config 会遮蔽同名的插件路由
+let MGMT_KEY = '';
+
+/* 面板密钥读取：与 CPA 管理中心的 enc::v1:: 可逆混淆保持一致，复用面板已保存的密钥 */
+const PANEL_ENC_PREFIX = 'enc::v1::';
+const PANEL_SECRET_SALT = 'cli-proxy-api-webui::secure-storage';
+function panelKeyBytes(){
+  try { return new TextEncoder().encode(PANEL_SECRET_SALT + '|' + window.location.host + '|' + navigator.userAgent); }
+  catch(e){ return new TextEncoder().encode(PANEL_SECRET_SALT); }
+}
+function deobfuscatePanelValue(raw){
+  raw = String(raw == null ? '' : raw);
+  if (!raw || raw.indexOf(PANEL_ENC_PREFIX) !== 0) return raw;
+  try {
+    const binary = atob(raw.slice(PANEL_ENC_PREFIX.length));
+    const enc = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) enc[i] = binary.charCodeAt(i);
+    const key = panelKeyBytes();
+    const out = new Uint8Array(enc.length);
+    for (let i = 0; i < enc.length; i++) out[i] = enc[i] ^ key[i % key.length];
+    return new TextDecoder().decode(out);
+  } catch(e){ return raw; }
+}
+function storageCandidates(){
+  const list = [];
+  try { list.push(window.localStorage); } catch(e){}
+  try { list.push(window.sessionStorage); } catch(e){}
+  try {
+    if (window.parent && window.parent !== window) {
+      try { list.push(window.parent.localStorage); } catch(e){}
+      try { list.push(window.parent.sessionStorage); } catch(e){}
+    }
+  } catch(e){}
+  return list;
+}
+function readItem(store, name){ try { return store && store.getItem ? store.getItem(name) : null; } catch(e){ return null; } }
+function extractKeyFromPanelStorage(){
+  for (const store of storageCandidates()) {
+    const authRaw = readItem(store, 'cli-proxy-auth');
+    if (authRaw) {
+      try {
+        const parsed = JSON.parse(deobfuscatePanelValue(authRaw));
+        const key = (parsed && parsed.state && parsed.state.managementKey) || (parsed && parsed.managementKey) || '';
+        if (String(key).trim()) return String(key).trim();
+      } catch(e){}
+    }
+    for (const name of ['managementKey', 'cli-proxy-management-key']) {
+      const raw = readItem(store, name);
+      if (!raw) continue;
+      const plain = deobfuscatePanelValue(raw);
+      if (plain && plain.trim()) {
+        try { const p = JSON.parse(plain); if (typeof p === 'string' && p.trim()) return p.trim(); } catch(e){}
+        return plain.trim();
+      }
+    }
+  }
+  return '';
+}
+function loadKey(){
+  MGMT_KEY = extractKeyFromPanelStorage();
+  try { if (!MGMT_KEY) MGMT_KEY = sessionStorage.getItem('pm.key') || ''; } catch(e){}
+  try { if (MGMT_KEY) sessionStorage.setItem('pm.key', MGMT_KEY); } catch(e){}
+}
+
+// api wraps fetch with the management key. A 401 re-extracts the key from
+// panel storage once and retries, so a rotated key recovers without a manual
+// page reload.
+async function api(path, opts){
+  opts = opts || {};
+  const send = async () => {
+    const headers = Object.assign({'Accept':'application/json'}, opts.headers || {});
+    if (MGMT_KEY) headers['Authorization'] = 'Bearer ' + MGMT_KEY;
+    if (opts.body) headers['Content-Type'] = 'application/json';
+    return fetch(API + path, Object.assign({}, opts, {headers}));
+  };
+  let resp = await send();
+  if (resp.status === 401) {
+    MGMT_KEY = '';
+    try { sessionStorage.removeItem('pm.key'); } catch(e2){}
+    loadKey();
+    if (MGMT_KEY) resp = await send();
+  }
+  let data = {};
+  try { data = await resp.json(); } catch(e){}
+  if (!resp.ok) throw new Error(data && data.error ? data.error : ('HTTP ' + resp.status));
+  return data;
+}
+
+/* ================= 状态 ================= */
+let cfg = null;            // {templates, selected_template, placeholders, write_concurrency}
+let samples = {};          // 占位符示例值（服务端按首个匹配账号试算）
+let filters = {q:'', provider:''};
+// 表格与预览均为服务端分页：rows 只含当前页，total/pages 来自响应
+let table = {rows: [], total: 0, page: 1, size: +(localStorage.getItem('pm.pageSize') || 50), pages: 1, providers: null};
+let pv = {rows: [], total: 0, page: 1, size: 50, pages: 1};
+// 勾选体系：selectAll 为真时执行范围 = 当前筛选全集减去 excluded（全选标记）；
+// 为假时执行范围 = sel 中手动勾选的索引
+const sel = new Set();
+const excluded = new Set();
+let selectAll = false;
+let execRunning = false;
+let pollTimer = null;
+let saveTimer = null;
+let searchTimer = null;
+let activeTplInput = null;
+let cfAction = null;
+
+/* ================= 视图工具 ================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+function toast(msg, type){
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type || '');
+  el.textContent = msg;
+  $('toasts').appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 320); }, 2600);
+}
+function openOverlay(id){ $(id).classList.add('open'); }
+function closeOverlay(id){ $(id).classList.remove('open'); if (id === 'cfOverlay') cfAction = null; }
+document.querySelectorAll('.overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) closeOverlay(o.id); }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.overlay.open').forEach(o => closeOverlay(o.id)); });
+
+function label(c){ return c.email || c.name; }
+// skipText 按服务端返回的跳过原因给出行内文案
+function skipText(reason){
+  switch (reason) {
+    case 'placeholder_unresolvable': return t('skip_ph');
+    case 'invalid_url': return t('skip_url');
+    case 'empty_template': return t('skip_empty');
+    default: return t('skip_generic');
+  }
+}
+// filterQS 把当前筛选编成查询串，表格、预览、计划、执行四处共用同一份参数
+function filterQS(extra){
+  const parts = [
+    'q=' + encodeURIComponent(filters.q),
+    'provider=' + encodeURIComponent(filters.provider)
+  ];
+  if (extra) parts.push(extra);
+  return parts.join('&');
+}
+// pageWindow 计算分页按钮的页码窗口（首末页必含，当前页前后各 2 页）
+function pageWindow(page, pages){
+  const win = [];
+  const push = v => { if (v >= 1 && v <= pages && !win.includes(v)) win.push(v); };
+  push(1); if (pages > 1) push(pages);
+  for (let d = -2; d <= 2; d++) push(page + d);
+  return win.sort((a, b) => a - b);
+}
+
+/* ================= 数据加载 ================= */
+async function loadConfig(){ cfg = await api('/settings'); }
+// fetchTable 拉取一页表格数据：服务端按同一筛选函数过滤与分页
+async function fetchTable(page){
+  try {
+    const qs = filterQS('page=' + (page || table.page) + '&size=' + table.size);
+    const data = await api('/credentials?' + qs);
+    table.rows = data.rows || [];
+    table.total = data.total || 0;
+    table.page = data.page || 1;
+    table.pages = data.pages || 1;
+    if (data.providers) { table.providers = data.providers; renderProviders(); }
+    samples = data.placeholder_samples || {};
+    renderTable();
+    refreshPhSamples();
+  } catch(e){
+    toast(t('load_fail') + '：' + e.message, 'err');
+  }
+}
+// fetchPreview 拉取预览弹窗的一页，含服务端按当前模板渲染的结果
+async function fetchPreview(page){
+  const body = $('pvBody');
+  body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--ink-3)">' + esc(t('loading')) + '</td></tr>';
+  try {
+    const qs = filterQS('page=' + (page || pv.page) + '&size=' + pv.size);
+    const data = await api('/preview?' + qs);
+    pv.rows = data.rows || [];
+    pv.total = data.total || 0;
+    pv.page = data.page || 1;
+    pv.pages = data.pages || 1;
+    $('pvSummary').innerHTML = t('filter_total') + ' <b>' + pv.total + '</b>' + t('filter_unit') + ' · ' + pv.page + t('page_of') + pv.pages;
+    body.innerHTML = pv.rows.map(c =>
+      '<tr><td class="cred">' + esc(label(c)) + '</td><td>' + esc(c.provider) + '</td>' +
+      '<td title="' + (c.proxy_url ? esc(c.proxy_url) : '') + '">' + (c.proxy_known ? (c.proxy_url ? esc(c.proxy_url) : esc(t('not_set'))) : esc(t('read_fail'))) + '</td>' +
+      '<td title="' + (c.preview ? esc(c.preview) : '') + '">' + (c.preview ? esc(c.preview) : ('—（' + esc(skipText(c.skip_reason)) + '）')) + '</td></tr>').join('');
+    renderPvPager();
+  } catch(e){
+    body.innerHTML = '';
+    toast(t('load_fail') + '：' + e.message, 'err');
+  }
+}
+// 保存配置只写配置本身，不触发任何凭据请求；预览与执行在下一次请求时
+// 自然使用最新配置
+async function saveConfig(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try { await api('/settings', {method:'PUT', body: JSON.stringify(cfg)}); }
+    catch(e){ toast(t('save_fail') + '：' + e.message, 'err'); }
+  }, 800);
+}
+
+// saveConfigNow 立即持久化配置（模板增删、切模板、占位符增删等场景）。
+async function saveConfigNow(){
+  clearTimeout(saveTimer);
+  try { await api('/settings', {method:'PUT', body: JSON.stringify(cfg)}); }
+  catch(e){ toast(t('save_fail') + '：' + e.message, 'err'); }
+}
+
+// refreshPhSamples rewrites the in-modal sample cells from the latest table
+// response; rows are not rebuilt so input focus stays.
+function refreshPhSamples(){
+  const overlay = document.getElementById('mtOverlay');
+  if (!overlay.classList.contains('open')) return;
+  document.querySelectorAll('#phBody tr').forEach(tr => {
+    const nameInput = tr.querySelector('input[data-k="name"]');
+    const cell = tr.querySelector('td.mono');
+    if (!nameInput || !cell) return;
+    const name = nameInput.value.trim().replace(/[{}]/g, '');
+    if (!name) return;
+    cell.textContent = '{' + name + '} = ' + (samples[name] || '（未取到）');
+    cell.title = cell.textContent;
+  });
+}
+
+/* ================= 渲染 ================= */
+function renderTplSel(){
+  if (!cfg) {
+    $('tplSel').innerHTML = '<option value="" disabled selected>' + esc(t('loading')) + '</option>';
+    return;
+  }
+  $('tplSel').innerHTML = (cfg.templates || []).map(tp =>
+    '<option value="' + esc(tp.id) + '"' + (tp.id === cfg.selected_template ? ' selected' : '') + '>' + esc(tp.name) + '</option>').join('');
+}
+function renderProviders(){
+  const sel0 = $('providerSel');
+  if (!table.providers) {
+    sel0.innerHTML = '<option value="" disabled selected>' + esc(t('loading')) + '</option>';
+    return;
+  }
+  sel0.innerHTML = '<option value="">' + esc(t('all_types')) + '</option>' +
+    table.providers.map(n => '<option value="' + esc(n) + '"' + (filters.provider === n ? ' selected' : '') + '>' + esc(n) + '</option>').join('');
+}
+function renderTable(){
+  const tb = $('tbody'); tb.innerHTML = '';
+  const head = $('checkAll');
+  if (head) {
+    head.checked = selectAll;
+    head.indeterminate = selectAll && excluded.size > 0;
+  }
+  table.rows.forEach(c => {
+    const tr = document.createElement('tr');
+    const checked = selectAll ? !excluded.has(c.auth_index) : sel.has(c.auth_index);
+    tr.innerHTML =
+      '<td><input type="checkbox" data-id="' + esc(c.auth_index) + '"' + (checked ? ' checked' : '') + (c.renderable ? '' : ' disabled') +
+        (c.renderable ? '' : ' title="' + esc(skipText(c.skip_reason)) + '"') + ' aria-label="' + esc(label(c)) + '"></td>' +
+      '<td><div class="cred-name">' + esc(label(c)) + '</div><div class="cred-sub">' + esc(c.name) + '</div></td>' +
+      '<td class="mono">' + esc(c.provider) + '</td>' +
+      '<td class="url ' + (c.proxy_url ? '' : 'none') + '" title="' + (c.proxy_known && c.proxy_url ? esc(c.proxy_url) : '') + '">' +
+        (c.proxy_known ? (c.proxy_url ? esc(c.proxy_url) : esc(t('not_set'))) : esc(t('read_fail'))) + '</td>';
+    tb.appendChild(tr);
+  });
+  $('empty').hidden = table.total > 0;
+  $('tfoot').style.visibility = table.total ? 'visible' : 'hidden';
+  $('resultInfo').textContent = table.total ? (t('filter_total') + ' ' + table.total + ' ' + t('filter_unit')) : '';
+  renderPager();
+  updateButtons();
+}
+function updateButtons(){
+  const n = selectAll ? Math.max(0, table.total - excluded.size) : sel.size;
+  $('selInfo').innerHTML = selectAll
+    ? ('已选全部 <b>' + n + '</b> 项' + (excluded.size ? '（排除 ' + excluded.size + '）' : ''))
+    : ('已选 <b>' + n + '</b> 项');
+  $('applyBtn').disabled = execRunning || n === 0;
+  $('clearBtn').disabled = execRunning || n === 0;
+  $('previewBtn').disabled = execRunning;
+}
+// pagerHTML 生成一段服务端分页控件 HTML（表格与预览弹窗共用）
+function pagerHTML(page, pages, withSize){
+  const win = pageWindow(page, pages);
+  let html = '<button ' + (page === 1 ? 'disabled' : '') + ' data-pg="' + (page - 1) + '" aria-label="上一页">‹</button><span class="pages">';
+  let prev = 0;
+  win.forEach(p => { if (p - prev > 1) html += '<span class="ellipsis">…</span>'; html += '<button class="' + (p === page ? 'cur' : '') + '" data-pg="' + p + '">' + p + '</button>'; prev = p; });
+  html += '</span><button ' + (page === pages ? 'disabled' : '') + ' data-pg="' + (page + 1) + '" aria-label="下一页">›</button>';
+  if (withSize) {
+    html += '<span>每页</span><select class="pgSizeSel" aria-label="每页条数">';
+    [20, 50, 100, 200].forEach(s => html += '<option value="' + s + '"' + (s === table.size ? ' selected' : '') + '>' + s + '</option>');
+    html += '</select>';
+  }
+  return html;
+}
+function bindPager(el, onPage, onSize){
+  el.querySelectorAll('button[data-pg]').forEach(b => b.onclick = () => onPage(+b.dataset.pg));
+  const selEl = el.querySelector('select.pgSizeSel');
+  if (selEl && onSize) selEl.onchange = e => onSize(+e.target.value);
+}
+function renderPager(){
+  $('pager').innerHTML = pagerHTML(table.page, table.pages, true);
+  bindPager($('pager'), p => fetchTable(p), s => { table.size = s; localStorage.setItem('pm.pageSize', s); fetchTable(1); });
+}
+function renderPvPager(){
+  $('pvPager').innerHTML = pagerHTML(pv.page, pv.pages, false);
+  bindPager($('pvPager'), p => fetchPreview(p), null);
+}
+
+/* ================= 模板管理 ================= */
+function validURLPreview(u){ return /^https?:\/\/|socks5h?:\/\//.test(String(u || '').trim()); }
+function renderMtpl(){
+  const tb = $('mtBody'); tb.innerHTML = '';
+  (cfg.templates || []).forEach((tp, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td class="name"><input data-k="name" data-id="' + esc(tp.id) + '" value="' + esc(tp.name) + '"></td>' +
+      '<td><input data-k="url" data-id="' + esc(tp.id) + '" style="font-family:var(--mono);font-size:12px" value="' + esc(tp.url) + '"></td>' +
+      '<td class="op"><button class="btn-sm danger" data-del="' + esc(tp.id) + '"' + (cfg.templates.length <= 1 ? ' disabled title="' + esc(t('at_least_one_tpl')) + '"' : '') + '>删除</button></td>';
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('input').forEach(inp => {
+    ['focus', 'click', 'keyup'].forEach(ev => inp.addEventListener(ev, () => { if (inp.dataset.k === 'url') activeTplInput = inp; }));
+    inp.oninput = () => {
+      const tp = cfg.templates.find(x => x.id === inp.dataset.id);
+      if (!tp) return;
+      if (inp.dataset.k === 'name') {
+        const v = inp.value.trim();
+        const bad = !v || cfg.templates.some(x => x.id !== tp.id && x.name === v);
+        inp.classList.toggle('invalid', bad);
+        inp.title = bad ? (v ? '名称已存在' : '名称不能为空') : '';
+        if (bad) return;
+        tp.name = v;
+        renderTplSel();
+        saveConfig();
+        return;
+      }
+      tp.url = inp.value;
+      const invalid = !!inp.value.trim() && !validURLPreview(inp.value.trim());
+      inp.classList.toggle('invalid', invalid);
+      if (invalid) return;
+      saveConfig();
+    };
+  });
+  tb.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    if (cfg.templates.length <= 1) return;
+    const target = cfg.templates.find(x => x.id === b.dataset.del);
+    if (target && !confirm(t('confirm_tpl_del') + '「' + target.name + '」？')) return;
+    cfg.templates = cfg.templates.filter(x => x.id !== b.dataset.del);
+    if (cfg.selected_template === b.dataset.del) cfg.selected_template = cfg.templates[0].id;
+    saveConfigNow().then(() => { renderMtpl(); renderPhs(); renderTplSel(); toast(t('tpl_deleted')); });
+  });
+}
+function renderPhs(){
+  const tb = $('phBody'); tb.innerHTML = '';
+  (cfg.placeholders || []).forEach(p => {
+    const sample = samples[p.name] || '（未取到）';
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td class="ph-name"><input data-k="name" data-name="' + esc(p.name) + '" value="' + esc(p.name) + '" style="font-family:var(--mono)" placeholder="占位符名"></td>' +
+      '<td class="ph-path"><input data-k="path" data-name="' + esc(p.name) + '" value="' + esc(p.path) + '" style="font-family:var(--mono)" placeholder="如 $.organization_uuid"></td>' +
+      '<td class="mono" style="font-size:12px;color:var(--ink-3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{x} = y">{' + esc(p.name) + '} = ' + esc(sample) + '</td>' +
+      '<td class="op"><div class="opbtns">' +
+        '<button class="btn-sm" data-ins="' + esc(p.name) + '" title="插入到模板输入框的光标处">插入</button>' +
+        '<button class="btn-sm danger" data-delph="' + esc(p.name) + '">删除</button>' +
+      '</div></td>';
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('input').forEach(inp => {
+    inp.oninput = () => {
+      const p = cfg.placeholders.find(x => x.name === inp.dataset.name);
+      if (!p) return;
+      if (inp.dataset.k === 'name') {
+        const v = inp.value.trim().replace(/[{}]/g, '');
+        const dup = cfg.placeholders.some(x => x !== p && x.name === v);
+        const bad = !v || dup || !/^\w+$/.test(v);
+        inp.classList.toggle('invalid', bad);
+        inp.title = bad ? (dup ? '名称已存在' : (v ? '名称仅限字母、数字、下划线' : '名称不能为空')) : '';
+        if (bad) return;
+        p.name = v;
+        inp.dataset.name = v;
+        const del = inp.closest('tr').querySelector('[data-delph]');
+        if (del) del.dataset.delph = v;
+        const ins = inp.closest('tr').querySelector('[data-ins]');
+        if (ins) ins.dataset.ins = v;
+      } else {
+        p.path = inp.value;
+      }
+      saveConfig();
+    };
+  });
+  tb.querySelectorAll('[data-ins]').forEach(b => b.onclick = () => insertPlaceholder(b.dataset.ins));
+  tb.querySelectorAll('[data-delph]').forEach(b => b.onclick = () => {
+    cfg.placeholders = cfg.placeholders.filter(p => p.name !== b.dataset.delph);
+    saveConfigNow().then(() => { renderPhs(); toast(t('ph_deleted')); });
+  });
+}
+function insertPlaceholder(name){
+  let input = (activeTplInput && document.contains(activeTplInput)) ? activeTplInput : null;
+  if (!input) {
+    const ae = document.activeElement;
+    if (ae && ae.matches && ae.matches('#mtBody input[data-k="url"]')) input = ae;
+  }
+  if (!input) { toast(t('cursor_first'), 'warn'); return; }
+  const tag = '{' + name + '}';
+  const st = input.selectionStart == null ? input.value.length : input.selectionStart;
+  const en = input.selectionEnd == null ? st : input.selectionEnd;
+  input.value = input.value.slice(0, st) + tag + input.value.slice(en);
+  const tp = cfg.templates.find(x => x.id === input.dataset.id);
+  if (tp) { tp.url = input.value; saveConfig(); }
+  const pos = st + tag.length;
+  input.focus(); input.setSelectionRange(pos, pos);
+  input.classList.toggle('invalid', !!input.value.trim() && !validURLPreview(input.value.trim()));
+}
+
+/* ================= 执行 ================= */
+function setExecLock(on){
+  ['tplSel', 'tplManageBtn', 'refreshBtn'].forEach(id => { $(id).disabled = on; $(id).title = on ? t('locked') : ''; });
+}
+// openConfirm 先取服务端按当前筛选算出的确认数字，再弹确认框；
+// 数字与最终执行由服务端同一个过滤函数产出，保证一致
+// selectionPayload 按当前选择模式构造执行载荷：全选标记发筛选与排除项，
+// 手动勾选发显式索引；服务端 plan 与 apply 用同一载荷
+function selectionPayload(mode){
+  return selectAll
+    ? {mode: mode, q: filters.q, provider: filters.provider, exclude: [...excluded]}
+    : {mode: mode, indexes: [...sel]};
+}
+async function openConfirm(mode){
+  if (execRunning) return;
+  if (!selectAll && !sel.size) { toast(t('select_first'), 'warn'); return; }
+  try {
+    const plan = await api('/plan', {method:'POST', body: JSON.stringify(selectionPayload(mode))});
+    if (!plan.will_do) { toast(t(mode === 'set' ? 'none_selectable' : 'none_clearable'), 'warn'); return; }
+    $('cfTitle').textContent = t(mode === 'set' ? 'confirm_set_title' : 'confirm_clear_title');
+    $('cfGo').textContent = t(mode === 'set' ? 'confirm_set_go' : 'confirm_clear_go');
+    $('cfBody').innerHTML = t(mode === 'set' ? 'confirm_set_line_1' : 'confirm_clear_line_1') + ' <b>' + plan.will_do + '</b>' + t('unit_accounts') +
+      (mode === 'clear' ? t('confirm_clear_note') : '。') + '<br>' +
+      (plan.skipped ? t('confirm_skip_line') + ' <b>' + plan.skipped + '</b>' + t('unit_accounts') + '。' : '');
+    cfAction = () => runApply(mode);
+    openOverlay('cfOverlay');
+  } catch(e){ toast(e.message, 'err'); }
+}
+async function runApply(mode){
+  try {
+    const resp = await api('/apply', {method:'POST', body: JSON.stringify(selectionPayload(mode))});
+    execRunning = true;
+    updateButtons();
+    setExecLock(true);
+    $('applyBtn').hidden = true; $('clearBtn').hidden = true; $('previewBtn').hidden = true; $('stopBtn').hidden = false;
+    const zone = $('progressZone'); zone.hidden = false; zone.style.display = 'flex';
+    zone.innerHTML = '<div class="prog"><div class="bar"><i style="width:0%"></i></div>' +
+      '<span class="nums">0/' + resp.total + (resp.skipped ? ' · 跳过 ' + resp.skipped : '') + '</span></div>';
+    toast(t('apply_started'));
+    startPolling();
+  } catch(e) {
+    toast(e.message, 'err');
+  }
+}
+function startPolling(){
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    let s;
+    try { s = await api('/status'); } catch(e){ return; }
+    const zone = $('progressZone');
+    if (s.running) {
+      const pct = s.total ? Math.round(s.done / s.total * 100) : 0;
+      zone.innerHTML = '<div class="prog"><div class="bar"><i style="width:' + pct + '%"></i></div>' +
+        '<span class="nums">' + (s.mode === 'clear' ? '正在清空' : '正在设置') + ' ' + s.done + '/' + s.total + ' · 成功 ' + s.ok + ' · 失败 ' + s.failed + '</span></div>';
+      return;
+    }
+    clearInterval(pollTimer);
+    execRunning = false;
+    setExecLock(false);
+    updateButtons();
+    $('stopBtn').hidden = true;
+    $('applyBtn').hidden = false;
+    $('previewBtn').hidden = false;
+    $('clearBtn').hidden = false;
+    zone.innerHTML = '<span class="nums">' + (s.stopped ? t('stopped') : t('done')) + '：成功 <b style="color:#fff">' + s.ok + '</b> · 失败 <b style="color:#F0B9AE">' + s.failed + '</b></span>';
+    if (s.failed > 0 && s.failures && s.failures.length) {
+      $('failZone').hidden = false;
+      $('failZone').innerHTML = '<b>' + esc(t('fail_detail')) + '</b><br>' + s.failures.map(f => esc(f.name) + '（' + esc(f.reason) + '）').join('<br>');
+    }
+    toast(s.stopped ? t('stopped') : t('done'), s.failed ? 'warn' : '');
+    fetchTable(table.page);
+  }, 600);
+}
+
+/* ================= 事件绑定 ================= */
+// 搜索输入防抖 300ms：每次筛选变化都由服务端按同一过滤函数返回第一页
+$('q').oninput = e => {
+  clearTimeout(searchTimer);
+  const v = e.target.value;
+  searchTimer = setTimeout(() => { filters.q = v; excluded.clear(); fetchTable(1); }, 300);
+};
+$('providerSel').onchange = e => { filters.provider = e.target.value; excluded.clear(); fetchTable(1); };
+$('clearFilter').onclick = () => { filters = {q:'', provider:''}; $('q').value = ''; renderProviders(); excluded.clear(); fetchTable(1); };
+// 表头全选是一个标记：执行范围 = 当前筛选全集；行内取消勾选记为排除项
+$('checkAll').onchange = e => {
+  selectAll = e.target.checked;
+  sel.clear();
+  excluded.clear();
+  renderTable();
+};
+$('tbody').addEventListener('change', e => {
+  if (e.target.type !== 'checkbox') return;
+  const id = e.target.dataset.id;
+  if (selectAll) {
+    e.target.checked ? excluded.delete(id) : excluded.add(id);
+  } else {
+    e.target.checked ? sel.add(id) : sel.delete(id);
+  }
+  renderTable();
+});
+$('tplSel').onchange = e => { cfg.selected_template = e.target.value; saveConfigNow().then(() => toast(t('tpl_switched') + '：' + (cfg.templates.find(x => x.id === e.target.value) || {}).name)); };
+$('tplManageBtn').onclick = () => {
+  if (!cfg) return;
+  renderMtpl(); renderPhs(); $('concInput').value = cfg.write_concurrency;
+  openOverlay('mtOverlay');
+};
+$('mtAdd').onclick = () => {
+  let i = 1, name = '新模板';
+  while (cfg.templates.some(x => x.name === name)) name = '新模板 ' + (++i);
+  cfg.templates.push({id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: name, url: 'http://Default.{account}:token@resin-host:2260'});
+  saveConfigNow().then(() => { renderMtpl(); renderTplSel(); });
+};
+$('mtClose').onclick = () => closeOverlay('mtOverlay');
+$('phAdd').onclick = () => {
+  let base = 'field', i = 1, name = base;
+  while (cfg.placeholders.some(p => p.name === name)) name = base + (++i);
+  cfg.placeholders.push({name: name, path: '$.'});
+  saveConfigNow().then(renderPhs);
+};
+$('phReset').onclick = () => {
+  if (!confirm(t('confirm_ph_reset'))) return;
+  cfg.placeholders = [];
+  saveConfigNow().then(() => { renderPhs(); toast(t('ph_restored')); });
+};
+$('concInput').onchange = e => {
+  const v = Math.max(1, Math.min(64, +e.target.value || 8));
+  e.target.value = v; cfg.write_concurrency = v;
+  saveConfig();
+};
+$('refreshBtn').onclick = async () => {
+  try { await loadConfig(); renderTplSel(); } catch(e){ toast(t('load_fail') + '：' + e.message, 'err'); }
+  await fetchTable(table.page);
+  toast(t('reloaded'));
+};
+// 预览弹窗每次打开都按当前筛选与最新配置取第一页
+$('previewBtn').onclick = () => {
+  if (execRunning) return;
+  $('pvSummary').textContent = t('loading');
+  openOverlay('pvOverlay');
+  fetchPreview(1);
+};
+$('pvClose').onclick = () => closeOverlay('pvOverlay');
+$('applyBtn').onclick = () => openConfirm('set');
+$('clearBtn').onclick = () => openConfirm('clear');
+$('cfGo').onclick = () => { const fn = cfAction; closeOverlay('cfOverlay'); if (fn) fn(); };
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => closeOverlay(b.dataset.close));
+$('stopBtn').onclick = async () => { try { await api('/stop', {method:'POST'}); toast(t('stopping'), 'warn'); } catch(e){ toast(e.message, 'err'); } };
+
+/* ================= 启动 ================= */
+(async function init(){
+  renderTplSel(); renderProviders();   // 先渲染「加载中」占位，避免空下拉
+  loadKey();
+  try { await loadConfig(); renderTplSel(); } catch(e){ toast(t('load_fail') + '：' + e.message, 'err'); }
+  await fetchTable(1);
+  const s = await api('/status').catch(() => null);
+  if (s && s.running) {
+    execRunning = true;
+    setExecLock(true);
+    updateButtons();
+    $('applyBtn').hidden = true; $('clearBtn').hidden = true; $('previewBtn').hidden = true; $('stopBtn').hidden = false;
+    const zone = $('progressZone'); zone.hidden = false; zone.style.display = 'flex';
+    startPolling();
+  }
+})();
+</script>
+</body>
+</html>
