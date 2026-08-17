@@ -1,0 +1,59 @@
+{
+  "schema_version": 2,
+  "plugins": [
+    {
+      "id": "cpa-proxy-manager",
+      "name": "代理批量设置",
+      "description": "按模板与占位符批量设置、清空 CPA 凭据的代理地址",
+      "author": "codexvn",
+      "version": "0.3.0",
+      "repository": "https://github.com/codexvn/cpa-proxy-manager",
+      "homepage": "https://github.com/codexvn/cpa-proxy-manager#readme",
+      "tags": [
+        "proxy",
+        "batch",
+        "management"
+      ],
+      "install": {
+        "type": "direct",
+        "artifacts": [
+          {
+            "goos": "darwin",
+            "goarch": "amd64",
+            "url": "https://github.com/codexvn/cpa-proxy-manager/releases/download/v0.3.0/cpa-proxy-manager_0.3.0_darwin_amd64.zip",
+            "sha256": "31c9cfe7c2367a5a80c08c885f925311955e42d3e57e637a37fb0f3c75699143",
+            "size": 2457769
+          },
+          {
+            "goos": "darwin",
+            "goarch": "arm64",
+            "url": "https://github.com/codexvn/cpa-proxy-manager/releases/download/v0.3.0/cpa-proxy-manager_0.3.0_darwin_arm64.zip",
+            "sha256": "9e5f5901d27da452a5d724aa381b27cd228d2f82cdc637bd4900e7bef970d61a",
+            "size": 2308199
+          },
+          {
+            "goos": "linux",
+            "goarch": "amd64",
+            "url": "https://github.com/codexvn/cpa-proxy-manager/releases/download/v0.3.0/cpa-proxy-manager_0.3.0_linux_amd64.zip",
+            "sha256": "a5fdceb647180c8eaa59d29acfb5f1001aaead50f0019eb74e45e7aaff8b43b1",
+            "size": 4465833
+          },
+          {
+            "goos": "linux",
+            "goarch": "arm64",
+            "url": "https://github.com/codexvn/cpa-proxy-manager/releases/download/v0.3.0/cpa-proxy-manager_0.3.0_linux_arm64.zip",
+            "sha256": "a17eb765e6ae1a10ff7d26d375227d60bd0932972e91bc72a0e65941dec03004",
+            "size": 4138003
+          },
+          {
+            "goos": "windows",
+            "goarch": "amd64",
+            "url": "https://github.com/codexvn/cpa-proxy-manager/releases/download/v0.3.0/cpa-proxy-manager_0.3.0_windows_amd64.zip",
+            "sha256": "c9a7ec46fc9fdf00f99091eb21b7afa1001cbca5989a6ec248cf32805c7c5184",
+            "size": 4383798
+          }
+        ]
+      }
+    }
+  ]
+}
