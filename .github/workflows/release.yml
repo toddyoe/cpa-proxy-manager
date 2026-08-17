@@ -53,10 +53,10 @@ jobs:
         if: matrix.cross == 'aarch64-linux-gnu'
         run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
 
-      - name: Install MinGW (windows)
+      - name: Add MinGW to PATH (windows)
         if: matrix.goos == 'windows'
-        shell: cmd
-        run: choco install mingw -y --no-progress
+        shell: bash
+        run: echo "/c/msys64/mingw64/bin" >> "$GITHUB_PATH"
 
       - name: Build
         shell: bash
@@ -64,9 +64,10 @@ jobs:
           CGO_ENABLED: '1'
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          EXT: ${{ matrix.ext }}
           CC: ${{ matrix.cross && format('{0}-gcc', matrix.cross) || (matrix.goos == 'windows' && 'gcc' || (matrix.darwin-arch && format('clang -arch {0}', matrix.darwin-arch) || 'cc')) }}
         run: |
-          go build -buildvcs=false -buildmode=c-shared -o out/ .
+          go build -buildvcs=false -buildmode=c-shared -o "out/lib.${EXT}" .
 
       - name: Package
         shell: python
@@ -81,7 +82,7 @@ jobs:
           goos, goarch, ext = os.environ["GOOS_ENV"], os.environ["GOARCH_ENV"], os.environ["EXT"]
           lib_name = f"cpa-proxy-manager-v{version}.{ext}"
           zip_name = f"cpa-proxy-manager_{version}_{goos}_{goarch}.zip"
-          os.rename(os.path.join("out", f"cpa-proxy-manager.{ext}"), os.path.join("out", lib_name))
+          os.rename(os.path.join("out", f"lib.{ext}"), os.path.join("out", lib_name))
           with zipfile.ZipFile(zip_name, "w", zipfile.ZIP_DEFLATED) as zf:
               zf.write(os.path.join("out", lib_name), lib_name)
           data = open(zip_name, "rb").read()
@@ -103,6 +104,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # registry.json 要提交回 main 分支，不能停留在 tag 的分离提交上
+          ref: main
 
       - uses: actions/download-artifact@v4
         with:
@@ -161,4 +165,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add registry.json
           git commit -m "chore: 更新插件源 registry.json 至 v${REF_NAME#v}" || exit 0
-          git push
+          git pull --rebase origin main
+          git push origin HEAD:main
