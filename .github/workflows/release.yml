@@ -145,7 +145,7 @@ jobs:
                   "id": "cpa-proxy-manager",
                   "name": "代理批量设置",
                   "description": "按模板与占位符批量设置、清空 CPA 凭据的代理地址",
-                  "author": "codexvn",
+                  "author": "toddyoe",
                   "version": version,
                   "repository": f"https://github.com/{repo}",
                   "homepage": f"https://github.com/{repo}#readme",
@@ -165,5 +165,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add registry.json
           git commit -m "chore: 更新插件源 registry.json 至 v${REF_NAME#v}" || exit 0
-          git pull --rebase origin main
-          git push origin HEAD:main
+          git pull --rebase origin dev
+          git push origin HEAD:dev

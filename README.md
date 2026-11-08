@@ -21,7 +21,7 @@ CPA 插件商店添加本仓库作为第三方源，之后在管理面板的插�
 plugins:
   enabled: true
   store-sources:
-    - "https://raw.githubusercontent.com/codexvn/cpa-proxy-manager/main/registry.json"
+    - "https://raw.githubusercontent.com/toddyoe/cpa-proxy-manager/main/registry.json"
 ```
 
 支持 windows/amd64、linux/amd64、linux/arm64、darwin/amd64、darwin/arm64 五个平台，安装包带 sha256 校验。

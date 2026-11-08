@@ -14,7 +14,7 @@ import (
 const (
 	pluginName            = "cpa-proxy-manager"
 	pluginDisplayName     = "代理批量设置"
-	pluginVersion         = "0.3.0"
+	pluginVersion         = "0.3.1"
 	resourceContentType   = "text/html; charset=utf-8"
 	jsonContentType       = "application/json; charset=utf-8"
 	managementRoutePrefix = "/plugins/" + pluginName
@@ -53,8 +53,8 @@ func pluginRegistration() registration {
 		Metadata: pluginapi.Metadata{
 			Name:             pluginDisplayName,
 			Version:          pluginVersion,
-			Author:           "codexvn",
-			GitHubRepository: "https://github.com/codexvn/cpa-proxy-manager",
+			Author:           "toddyoe",
+			GitHubRepository: "https://github.com/toddyoe/cpa-proxy-manager",
 			ConfigFields:     []pluginapi.ConfigField{},
 		},
 		Capabilities: registrationCapabilities{
