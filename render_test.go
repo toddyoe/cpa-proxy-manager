@@ -153,3 +153,24 @@ func TestRenderPreviewReasons(t *testing.T) {
 		t.Errorf("skip reason = %q, want invalid_url", reason)
 	}
 }
+
+func TestRenderTemplateAPIKeyAccount(t *testing.T) {
+	cred := &Credential{
+		SourceKind: sourceAPIKey,
+		Provider:   "claude",
+		Account:    "3f2a1b7c",
+		JSON: map[string]any{
+			"sha256": "3f2a1b7c00000000000000000000000000000000000000000000000000000000",
+		},
+	}
+	if got := RenderTemplate("http://{account}.{provider}@gw:2260", nil, cred); got != "http://3f2a1b7c.claude@gw:2260" {
+		t.Fatalf("API key builtins = %q", got)
+	}
+	if got := RenderTemplate("http://{email}@gw:2260", nil, cred); got != "" {
+		t.Fatalf("API key email should be unresolvable, got %q", got)
+	}
+	phs := []Placeholder{{Name: "digest", Path: "$.sha256"}}
+	if got := RenderTemplate("http://{digest}@gw:2260", phs, cred); got != "http://3f2a1b7c00000000000000000000000000000000000000000000000000000000@gw:2260" {
+		t.Fatalf("API key sha256 placeholder = %q", got)
+	}
+}

@@ -172,7 +172,8 @@ table.pv{width:100%;border-collapse:collapse}
   <div class="toolbar">
     <input type="search" id="q" placeholder="搜索账号 / 文件名" aria-label="搜索账号">
     <div class="tgroup">
-      <select id="providerSel" aria-label="按类型筛选"></select>
+      <select id="kindSel" aria-label="按凭据类型筛选"></select>
+      <select id="providerSel" aria-label="按提供商筛选"></select>
       <select id="boundSel" aria-label="按代理绑定状态筛选"></select>
     </div>
     <div class="tgroup">
@@ -190,7 +191,7 @@ table.pv{width:100%;border-collapse:collapse}
         <tr>
           <th style="width:34px"><input type="checkbox" id="checkAll" aria-label="全选当前筛选结果"></th>
           <th data-i18n="col_account">账号</th>
-          <th style="width:90px" data-i18n="col_type">类型</th>
+          <th style="width:150px" data-i18n="col_type">类型</th>
           <th data-i18n="col_current">当前代理</th>
         </tr>
       </thead>
@@ -272,7 +273,7 @@ table.pv{width:100%;border-collapse:collapse}
         <input type="number" id="concInput" min="1" max="64">
         <span class="builtin" data-i18n="conc_hint">1–64，默认 8</span>
       </div>
-      <p class="hint">内置：<code>{account}</code> 邮箱前缀 · <code>{email}</code> 完整邮箱 · <code>{provider}</code> 账号类型。自定义占位符按点路径（如 <code>$.organization_uuid</code>，数组用数字下标）从认证文件 JSON 取标量值；与内置同名时自定义优先。先点击聚焦某个模板地址输入框，再点「插入」，占位符会写入光标处。占位符取不到值或渲染出的地址不合法时，该账号会被跳过，执行时计入跳过数。</p>
+      <p class="hint">内置：<code>{account}</code> OAuth 为邮箱前缀、API Key 为身份摘要前 8 位 · <code>{email}</code> 完整邮箱（仅 OAuth） · <code>{provider}</code> 提供商。自定义占位符按点路径从认证 JSON 或 API Key 安全上下文取标量值；API Key 可读 <code>$.sha256</code>、<code>$.account</code>、<code>$.name</code>、<code>$.base-url</code> 等字段，不会暴露原始 Key。新增名称为 <code>sha256</code>、路径为 <code>$.sha256</code> 的占位符后即可使用 <code>{sha256}</code>。占位符取不到值或渲染出的地址不合法时，该账号会被跳过并计入跳过数。</p>
     </div>
     <footer><button class="btn-sm" id="mtClose" data-i18n="close">关闭</button></footer>
   </div>
@@ -285,7 +286,7 @@ table.pv{width:100%;border-collapse:collapse}
 /* ================= i18n（单一中文语言包） ================= */
 const I18N = {
   title:'代理批量设置', refresh:'刷新', tpl_pick:'代理模板', tpl_manage:'模板管理',
-  all_types:'全部类型',
+  all_types:'全部类型', kind_all:'全部凭据', kind_oauth:'OAuth 认证', kind_apikey:'API Key',
   bound_all:'不限绑定状态', bound_yes:'已绑定代理', bound_no:'未绑定代理',
   col_account:'账号', col_type:'类型', col_current:'当前代理', col_after:'设置后',
   empty_text:'未找到匹配的账号', clear_filter:'清除筛选',
@@ -302,14 +303,15 @@ const I18N = {
   confirm_set_title:'确认批量设置', confirm_clear_title:'确认批量清空',
   confirm_set_go:'确认批量设置', confirm_clear_go:'确认批量清空',
   confirm_set_line_1:'将写入代理地址的账号', confirm_clear_line_1:'将清空代理地址的账号',
-  confirm_skip_line:'跳过', confirm_clear_note:'，清空后回退到全局代理（未配置则直连）。',
+  confirm_skip_line:'跳过', confirm_clear_note:'，OAuth 回退到全局代理；API Key 移除 Key 级覆盖并回退到组级/全局代理。',
   apply_started:'已开始执行', stopping:'正在停止…', stopped:'已停止', done:'执行完成',
   fail_detail:'失败明细：', none_selectable:'所选账号均无法套用模板（占位符无法解析）',
   none_clearable:'所选账号均未设置代理，无需清空', locked:'执行中已锁定',
   saved:'配置已保存', save_fail:'保存失败', ph_deleted:'占位符已删除', tpl_deleted:'模板已删除',
   ph_restored:'已清空自定义占位符', confirm_tpl_del:'删除模板', confirm_ph_reset:'将清空所有自定义占位符。确定？',
   at_least_one_tpl:'至少保留一个模板', cursor_first:'请先将光标定位到要插入的模板输入框',
-  filter_total:'共', filter_unit:'条', page_of:' / '
+  filter_total:'共', filter_unit:'条', page_of:' / ',
+  proxy_key:'Key 级', proxy_group:'继承组配置', proxy_global:'全局代理', proxy_credential:'凭据级', proxy_none:'未设置'
 };
 function t(k){ return I18N[k] || k; }
 
@@ -406,7 +408,7 @@ async function api(path, opts){
 /* ================= 状态 ================= */
 let cfg = null;            // {templates, selected_template, placeholders, write_concurrency}
 let samples = {};          // 占位符示例值（服务端按首个匹配账号试算）
-let filters = {q:'', provider:'', bound:''};
+let filters = {q:'', kind:'', provider:'', bound:''};
 // 表格与预览均为服务端分页：rows 只含当前页，total/pages 来自响应
 let table = {rows: [], total: 0, page: 1, size: +(localStorage.getItem('pm.pageSize') || 50), pages: 1, providers: null};
 let pv = {rows: [], total: 0, page: 1, size: 50, pages: 1};
@@ -421,6 +423,7 @@ let saveTimer = null;
 let searchTimer = null;
 let activeTplInput = null;
 let cfAction = null;
+let lastWarning = '';
 
 /* ================= 视图工具 ================= */
 const $ = id => document.getElementById(id);
@@ -437,7 +440,17 @@ function closeOverlay(id){ $(id).classList.remove('open'); if (id === 'cfOverlay
 document.querySelectorAll('.overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) closeOverlay(o.id); }));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.overlay.open').forEach(o => closeOverlay(o.id)); });
 
-function label(c){ return c.email || c.name; }
+function label(c){ return c.email || c.account || c.name; }
+function sourceLabel(c){ return c.source_kind === 'api_key' ? t('kind_apikey') : t('kind_oauth'); }
+function proxySourceLabel(source){
+  switch (source) {
+    case 'key': return t('proxy_key');
+    case 'group': return t('proxy_group');
+    case 'global': return t('proxy_global');
+    case 'credential': return t('proxy_credential');
+    default: return t('proxy_none');
+  }
+}
 // skipText 按服务端返回的跳过原因给出行内文案
 function skipText(reason){
   switch (reason) {
@@ -451,6 +464,7 @@ function skipText(reason){
 function filterQS(extra){
   const parts = [
     'q=' + encodeURIComponent(filters.q),
+    'kind=' + encodeURIComponent(filters.kind),
     'provider=' + encodeURIComponent(filters.provider),
     'bound=' + encodeURIComponent(filters.bound)
   ];
@@ -479,6 +493,9 @@ async function fetchTable(page){
     table.pages = data.pages || 1;
     if (data.providers) { table.providers = data.providers; renderProviders(); }
     samples = data.placeholder_samples || {};
+    const warning = (data.warnings || []).join('；');
+    if (warning && warning !== lastWarning) toast(warning, 'warn');
+    lastWarning = warning;
     renderTable();
     refreshPhSamples();
   } catch(e){
@@ -498,7 +515,7 @@ async function fetchPreview(page){
     pv.pages = data.pages || 1;
     $('pvSummary').innerHTML = t('filter_total') + ' <b>' + pv.total + '</b>' + t('filter_unit') + ' · ' + pv.page + t('page_of') + pv.pages;
     body.innerHTML = pv.rows.map(c =>
-      '<tr><td class="cred">' + esc(label(c)) + '</td><td>' + esc(c.provider) + '</td>' +
+      '<tr><td class="cred">' + esc(label(c)) + '<div class="cred-sub">' + esc(c.name) + '</div></td><td>' + esc(c.provider) + '<div class="cred-sub">' + esc(sourceLabel(c)) + '</div></td>' +
       '<td title="' + (c.proxy_url ? esc(c.proxy_url) : '') + '">' + (c.proxy_known ? (c.proxy_url ? esc(c.proxy_url) : esc(t('not_set'))) : esc(t('read_fail'))) + '</td>' +
       '<td title="' + (c.preview ? esc(c.preview) : '') + '">' + (c.preview ? esc(c.preview) : ('—（' + esc(skipText(c.skip_reason)) + '）')) + '</td></tr>').join('');
     renderPvPager();
@@ -557,6 +574,14 @@ function renderBoundSel(){
     '<option value="bound"' + (cur === 'bound' ? ' selected' : '') + '>' + esc(t('bound_yes')) + '</option>' +
     '<option value="unbound"' + (cur === 'unbound' ? ' selected' : '') + '>' + esc(t('bound_no')) + '</option>';
 }
+function renderKindSel(){
+  const sel0 = $('kindSel');
+  const cur = filters.kind || '';
+  sel0.innerHTML =
+    '<option value="">' + esc(t('kind_all')) + '</option>' +
+    '<option value="oauth"' + (cur === 'oauth' ? ' selected' : '') + '>' + esc(t('kind_oauth')) + '</option>' +
+    '<option value="api_key"' + (cur === 'api_key' ? ' selected' : '') + '>' + esc(t('kind_apikey')) + '</option>';
+}
 function renderProviders(){
   const sel0 = $('providerSel');
   if (!table.providers) {
@@ -575,14 +600,15 @@ function renderTable(){
   }
   table.rows.forEach(c => {
     const tr = document.createElement('tr');
-    const checked = selectAll ? !excluded.has(c.auth_index) : sel.has(c.auth_index);
+    const checked = selectAll ? !excluded.has(c.target_id) : sel.has(c.target_id);
     tr.innerHTML =
-      '<td><input type="checkbox" data-id="' + esc(c.auth_index) + '"' + (checked ? ' checked' : '') + (c.renderable ? '' : ' disabled') +
+      '<td><input type="checkbox" data-id="' + esc(c.target_id) + '"' + (checked ? ' checked' : '') + (c.renderable ? '' : ' disabled') +
         (c.renderable ? '' : ' title="' + esc(skipText(c.skip_reason)) + '"') + ' aria-label="' + esc(label(c)) + '"></td>' +
       '<td><div class="cred-name">' + esc(label(c)) + '</div><div class="cred-sub">' + esc(c.name) + '</div></td>' +
-      '<td class="mono">' + esc(c.provider) + '</td>' +
+      '<td class="mono" title="' + esc(c.provider) + '">' + esc(c.provider) + '<div class="cred-sub">' + esc(sourceLabel(c)) + '</div></td>' +
       '<td class="url ' + (c.proxy_url ? '' : 'none') + '" title="' + (c.proxy_known && c.proxy_url ? esc(c.proxy_url) : '') + '">' +
-        (c.proxy_known ? (c.proxy_url ? esc(c.proxy_url) : esc(t('not_set'))) : esc(t('read_fail'))) + '</td>';
+        (c.proxy_known ? (c.proxy_url ? esc(c.proxy_url) : esc(t('not_set'))) : esc(t('read_fail'))) +
+        (c.proxy_source ? '<div class="cred-sub">' + esc(proxySourceLabel(c.proxy_source)) + '</div>' : '') + '</td>';
     tb.appendChild(tr);
   });
   $('empty').hidden = table.total > 0;
@@ -744,7 +770,7 @@ function setExecLock(on){
 // 手动勾选发显式索引；服务端 plan 与 apply 用同一载荷
 function selectionPayload(mode){
   return selectAll
-    ? {mode: mode, q: filters.q, provider: filters.provider, bound: filters.bound, exclude: [...excluded]}
+    ? {mode: mode, q: filters.q, kind: filters.kind, provider: filters.provider, bound: filters.bound, exclude: [...excluded]}
     : {mode: mode, indexes: [...sel]};
 }
 async function openConfirm(mode){
@@ -815,9 +841,10 @@ $('q').oninput = e => {
   const v = e.target.value;
   searchTimer = setTimeout(() => { filters.q = v; excluded.clear(); fetchTable(1); }, 300);
 };
+$('kindSel').onchange = e => { filters.kind = e.target.value; excluded.clear(); fetchTable(1); };
 $('providerSel').onchange = e => { filters.provider = e.target.value; excluded.clear(); fetchTable(1); };
 $('boundSel').onchange = e => { filters.bound = e.target.value; excluded.clear(); fetchTable(1); };
-$('clearFilter').onclick = () => { filters = {q:'', provider:'', bound:''}; $('q').value = ''; renderProviders(); renderBoundSel(); excluded.clear(); fetchTable(1); };
+$('clearFilter').onclick = () => { filters = {q:'', kind:'', provider:'', bound:''}; $('q').value = ''; renderKindSel(); renderProviders(); renderBoundSel(); excluded.clear(); fetchTable(1); };
 // 表头全选是一个标记：执行范围 = 当前筛选全集；行内取消勾选记为排除项
 $('checkAll').onchange = e => {
   selectAll = e.target.checked;
@@ -885,7 +912,7 @@ $('stopBtn').onclick = async () => { try { await api('/stop', {method:'POST'}); 
 
 /* ================= 启动 ================= */
 (async function init(){
-  renderTplSel(); renderProviders(); renderBoundSel();   // 先渲染「加载中」占位，避免空下拉
+  renderTplSel(); renderKindSel(); renderProviders(); renderBoundSel();   // 先渲染「加载中」占位，避免空下拉
   loadKey();
   try { await loadConfig(); renderTplSel(); } catch(e){ toast(t('load_fail') + '：' + e.message, 'err'); }
   await fetchTable(1);

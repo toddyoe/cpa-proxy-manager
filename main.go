@@ -14,7 +14,7 @@ import (
 const (
 	pluginName            = "cpa-proxy-manager"
 	pluginDisplayName     = "代理批量设置"
-	pluginVersion         = "0.3.1"
+	pluginVersion         = "0.4.0"
 	resourceContentType   = "text/html; charset=utf-8"
 	jsonContentType       = "application/json; charset=utf-8"
 	managementRoutePrefix = "/plugins/" + pluginName
@@ -109,9 +109,9 @@ func dispatchManagement(req pluginapi.ManagementRequest) pluginapi.ManagementRes
 	case method == http.MethodGet && matchesResourcePath(req.Path, "/status"):
 		return htmlResponse(http.StatusOK, renderUIPage())
 	case method == http.MethodGet && matchesManagementPath(req.Path, "/credentials"):
-		return handleCredentials(req.Query)
+		return handleCredentials(req)
 	case method == http.MethodGet && matchesManagementPath(req.Path, "/preview"):
-		return handlePreview(req.Query)
+		return handlePreview(req)
 	case method == http.MethodPost && matchesManagementPath(req.Path, "/plan"):
 		return handlePlan(req)
 	case method == http.MethodGet && matchesManagementPath(req.Path, "/settings"):
@@ -131,33 +131,33 @@ func dispatchManagement(req pluginapi.ManagementRequest) pluginapi.ManagementRes
 	}
 }
 
-// inventoryPage runs the shared request pipeline: one host.auth.list for
-// metadata, the shared filter, then one page of hydrated rows.
-func inventoryPage(query url.Values) (rows []CredentialView, f PageFilter, total int, pages int, providers []string, tplName string, samples map[string]string, err error) {
+// inventoryPage runs the shared request pipeline over auth files and config
+// API keys, then returns one page of hydrated rows.
+func inventoryPage(headers http.Header, query url.Values) (rows []CredentialView, f PageFilter, total int, pages int, providers []string, tplName string, samples map[string]string, warnings []string, err error) {
 	f = ParsePageFilter(query)
 	cfg := configStore()
 	snapshot := cfg.Snapshot()
 	tpl, _ := snapshot.Selected()
-	entries, errList := callHostAuthList()
+	creds, warnings, errList := loadCredentialInventory(headers)
 	if errList != nil {
-		return nil, f, 0, 0, nil, "", nil, errList
+		return nil, f, 0, 0, nil, "", nil, nil, errList
 	}
-	providers = distinctProviders(entries)
-	filtered := FilterEntries(entries, f.Q, f.Provider, f.Bound)
+	providers = distinctCredentialProviders(creds)
+	filtered := filterCredentials(creds, f.Q, f.Provider, f.Kind, f.Bound)
 	total = len(filtered)
-	pageEntries, page, pages := PageSlice(filtered, f.Page, f.Size)
+	pageCreds, page, pages := PageSlice(filtered, f.Page, f.Size)
 	f.Page = page
-	views := Hydrate(pageEntries, tpl, snapshot.Placeholders)
+	views := credentialViews(pageCreds, tpl, snapshot.Placeholders)
 	if len(filtered) > 0 {
-		samples = placeholderSamplesFor(filtered[0], snapshot.Placeholders)
+		samples = placeholderSamplesForCredential(filtered[0], snapshot.Placeholders)
 	} else {
 		samples = map[string]string{}
 	}
-	return views, f, total, pages, providers, tpl.Name, samples, nil
+	return views, f, total, pages, providers, tpl.Name, samples, warnings, nil
 }
 
-func handleCredentials(query url.Values) pluginapi.ManagementResponse {
-	views, f, total, pages, providers, tplName, samples, err := inventoryPage(query)
+func handleCredentials(req pluginapi.ManagementRequest) pluginapi.ManagementResponse {
+	views, f, total, pages, providers, tplName, samples, warnings, err := inventoryPage(req.Headers, req.Query)
 	if err != nil {
 		return jsonResponse(http.StatusServiceUnavailable, map[string]any{"error": T("err_host_unable") + "：" + err.Error()})
 	}
@@ -174,24 +174,27 @@ func handleCredentials(query url.Values) pluginapi.ManagementResponse {
 		"size":                f.Size,
 		"pages":               pages,
 		"providers":           providers,
+		"kind":                f.Kind,
 		"template_id":         cfg.SelectedTemplate,
 		"template_name":       tplName,
 		"placeholder_samples": samples,
+		"warnings":            warnings,
 		"rows":                views,
 	})
 }
 
-func handlePreview(query url.Values) pluginapi.ManagementResponse {
-	views, f, total, pages, _, _, _, err := inventoryPage(query)
+func handlePreview(req pluginapi.ManagementRequest) pluginapi.ManagementResponse {
+	views, f, total, pages, _, _, _, warnings, err := inventoryPage(req.Headers, req.Query)
 	if err != nil {
 		return jsonResponse(http.StatusServiceUnavailable, map[string]any{"error": T("err_host_unable") + "：" + err.Error()})
 	}
 	return jsonResponse(http.StatusOK, map[string]any{
-		"total": total,
-		"page":  f.Page,
-		"size":  f.Size,
-		"pages": pages,
-		"rows":  views,
+		"total":    total,
+		"page":     f.Page,
+		"size":     f.Size,
+		"pages":    pages,
+		"warnings": warnings,
+		"rows":     views,
 	})
 }
 
@@ -200,11 +203,16 @@ func handlePlan(req pluginapi.ManagementRequest) pluginapi.ManagementResponse {
 	if !ok {
 		return rejection
 	}
-	_, counts, err := ResolveBatch(body)
+	_, counts, warnings, err := ResolveBatch(req.Headers, body)
 	if err != nil {
 		return batchError(err)
 	}
-	return jsonResponse(http.StatusOK, counts)
+	return jsonResponse(http.StatusOK, map[string]any{
+		"matched":  counts.Matched,
+		"will_do":  counts.WillDo,
+		"skipped":  counts.Skipped,
+		"warnings": warnings,
+	})
 }
 
 func handleConfigSave(req pluginapi.ManagementRequest) pluginapi.ManagementResponse {
@@ -253,7 +261,7 @@ func handleApply(req pluginapi.ManagementRequest) pluginapi.ManagementResponse {
 	}
 
 	snapshot := configStore().Snapshot()
-	targets, counts, err := ResolveBatch(body)
+	targets, counts, warnings, err := ResolveBatch(req.Headers, body)
 	if err != nil {
 		return batchError(err)
 	}
@@ -275,6 +283,7 @@ func handleApply(req pluginapi.ManagementRequest) pluginapi.ManagementResponse {
 		"mode":     body.Mode,
 		"total":    counts.WillDo,
 		"skipped":  counts.Skipped,
+		"warnings": warnings,
 	})
 }
 

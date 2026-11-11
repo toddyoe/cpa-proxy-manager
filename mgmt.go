@@ -235,3 +235,58 @@ func PatchProxyURL(ctx context.Context, fileName, value string, headers http.Hea
 	_, _, err := callMgmtAPI(ctx, http.MethodPatch, "/v0/management/auth-files/fields", body, headers)
 	return err
 }
+
+func executeMgmtRequestWithHeaders(ctx context.Context, method, baseURL, path string, body []byte, password string, extra http.Header) (int, http.Header, []byte, error) {
+	req, errRequest := http.NewRequestWithContext(ctx, method, strings.TrimRight(baseURL, "/")+path, bytes.NewReader(body))
+	if errRequest != nil {
+		return 0, nil, nil, errRequest
+	}
+	req.Header.Set("Authorization", "Bearer "+password)
+	req.Header.Set("Accept", "application/json")
+	for key, values := range extra {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
+	}
+	if len(body) > 0 {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, errDo := mgmtHTTPDo(req)
+	if errDo != nil {
+		return 0, nil, nil, errDo
+	}
+	defer resp.Body.Close()
+	raw, errRead := io.ReadAll(resp.Body)
+	if errRead != nil {
+		return resp.StatusCode, resp.Header.Clone(), nil, errRead
+	}
+	return resp.StatusCode, resp.Header.Clone(), raw, nil
+}
+
+// callMgmtAPIWithHeaders is the response-header-aware variant used by v8
+// config writes that need ETag/If-Match coordination.
+func callMgmtAPIWithHeaders(ctx context.Context, method, path string, body []byte, headers, extra http.Header) (int, http.Header, []byte, error) {
+	password := resolveManagementPassword(headers)
+	if password == "" {
+		return 0, nil, nil, ErrMgmtUnauthorized
+	}
+	baseURL := resolveMgmtBaseURL()
+	status, respHeaders, raw, err := executeMgmtRequestWithHeaders(ctx, method, baseURL, path, body, password, extra)
+	if err != nil {
+		if _, explicit := configuredMgmtBaseURL(); !explicit {
+			if alt := schemeFlipped(baseURL); alt != "" && isLoopbackHost(hostOf(baseURL)) && looksLikeSchemeMismatch(err) {
+				if status2, headers2, raw2, err2 := executeMgmtRequestWithHeaders(ctx, method, alt, path, body, password, extra); err2 == nil {
+					return status2, headers2, raw2, nil
+				}
+			}
+		}
+		return status, respHeaders, raw, err
+	}
+	if status == http.StatusUnauthorized {
+		return status, respHeaders, raw, ErrMgmtUnauthorized
+	}
+	if status < 200 || status >= 300 {
+		return status, respHeaders, raw, fmt.Errorf("CPA 管理 API 返回 HTTP %d", status)
+	}
+	return status, respHeaders, raw, nil
+}

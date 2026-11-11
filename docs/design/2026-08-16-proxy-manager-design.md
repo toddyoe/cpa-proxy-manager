@@ -121,8 +121,9 @@ cpa-proxy-manager/
 ├── main.go           // ABI 入口、插件注册、管理路由分发与资源页
 ├── engine.go         // 批次生命周期：互斥、并发执行、协作停止、进度快照
 ├── render.go         // 模板渲染与校验：占位符解析（自定义优先、内置兜底）、URL 合法性
-├── credentials.go    // 凭据数据面：共享筛选、分页参数与页切片、按路径直读认证文件、批次目标解析
-├── mgmt.go           // CPA 管理 API 客户端：回环基址、密钥提取、PATCH fields
+├── credentials.go    // 凭据数据面：OAuth 文件与 API Key 清单合并、共享筛选、分页、批次目标解析
+├── api_keys.go       // API Key 身份摘要、v8 配置读取、组/Key 展开、ETag 写回
+├── mgmt.go           // CPA 管理 API 客户端：回环基址、密钥提取、PATCH fields、ETag 响应头
 ├── config.go         // config.json 原子读写与校验
 ├── ui.go             // 管理页面单 HTML 内嵌（go:embed）
 ├── i18n.go           // 中文文案包
@@ -136,10 +137,11 @@ cpa-proxy-manager/
 
 ```go
 // credentials.go
-func ParsePageFilter(query url.Values) PageFilter                       // 读取并钳制 q/provider/page/size
-func MatchFilter(entry HostAuthFileEntry, q, provider string) bool      // 唯一筛选谓词：provider 精确、q 对邮箱或文件名不区分大小写包含
-func Hydrate(entries []HostAuthFileEntry, tpl Template, phs []Placeholder) []CredentialView // 并发直读文件并渲染
-func ResolveBatch(req batchRequest) ([]EngineTarget, PlanCounts, error)  // plan 与 apply 共用的选择解析
+func ParsePageFilter(query url.Values) PageFilter // 读取并钳制 q/kind/provider/page/size
+func credentialMatches(cred Credential, q, provider string) bool // 元数据匹配：provider 精确、q 对邮箱/文件名/摘要不区分大小写包含
+func filterCredentials(creds []Credential, q, provider, kind, bound string) []Credential // 表格、预览、计划、执行共用的筛选入口
+func credentialViews(creds []Credential, tpl Template, phs []Placeholder) []CredentialView // 按需读取文件并渲染
+func ResolveBatch(headers http.Header, req batchRequest) ([]EngineTarget, PlanCounts, []string, error) // plan 与 apply 共用的选择解析
 
 // engine.go
 func (e *engineState) Start(mode string, targets []EngineTarget, concurrency int, headers http.Header) error // 执行中返回 ErrBusy
@@ -162,7 +164,7 @@ func PatchProxyURL(ctx context.Context, fileName, value string, headers http.Hea
 
 **配置路由命名 `/settings`**。宿主注册了内置路由 `GET/PUT/PATCH /plugins/:id/config`（服务插件实例启停配置），会遮蔽插件同名自声明路由；插件配置路由因此命名为 `/settings`。
 
-**共享筛选谓词**。表格、预览、执行三条路径全部调用服务端同一个 `MatchFilter`，前端不做本地过滤，从机制上保证界面展示的筛选结果就是实际执行的目标集合。
+**共享筛选入口**。表格、预览、计划与执行四条路径全部调用服务端同一套 `credentialMatches` / `filterCredentials`，前端不做本地过滤，从机制上保证界面展示的筛选结果就是实际执行的目标集合。
 
 **后端异步执行，前端轮询进度**。渲染只在插件后端完成，前端仅展示并轮询（接口返回 202 后由前端每 600 毫秒轮询一次），执行不与页面生命周期绑定。
 
@@ -189,8 +191,9 @@ func PatchProxyURL(ctx context.Context, fileName, value string, headers http.Hea
 
 | 参数 | 位置 | 类型 | 必填 | 说明 |
 |------|------|------|------|------|
-| q | query | string | 否 | 对邮箱或文件名不区分大小写做包含匹配，默认空 |
-| provider | query | string | 否 | 类型精确匹配，空为全部 |
+| q | query | string | 否 | 对邮箱、文件名、API Key 摘要不区分大小写做包含匹配，默认空 |
+| kind | query | string | 否 | `oauth` 或 `api_key`，空为全部 |
+| provider | query | string | 否 | 提供商精确匹配，空为全部 |
 | page | query | int | 否 | 页码，≥1，默认 1 |
 | size | query | int | 否 | 每页条数，1–500，默认 50 |
 
@@ -237,12 +240,13 @@ func PatchProxyURL(ctx context.Context, fileName, value string, headers http.Hea
 | 参数 | 位置 | 类型 | 必填 | 说明 |
 |------|------|------|------|------|
 | mode | body | string | 是 | `set` 或 `clear` |
-| indexes | body | string[] | 二选一 | 手动勾选模式：auth_index 数组 |
+| indexes | body | string[] | 二选一 | 手动勾选模式：`target_id` 数组 |
 | q | body | string | 二选一 | 全选标记模式：搜索词 |
-| provider | body | string | 二选一 | 全选标记模式：类型筛选 |
-| exclude | body | string[] | 否 | 全选标记模式下被排除的 auth_index 数组 |
+| kind | body | string | 否 | 全选标记模式：`oauth` / `api_key` |
+| provider | body | string | 二选一 | 全选标记模式：提供商筛选 |
+| exclude | body | string[] | 否 | 全选标记模式下被排除的 `target_id` 数组 |
 
-`indexes` 非空时按显式勾选解析，忽略 `q`/`provider`/`exclude`；否则按筛选全集减排除项解析。
+`indexes` 非空时按显式勾选解析，忽略 `q`/`kind`/`provider`/`exclude`；否则按筛选全集减排除项解析。
 
 ```json
 { "matched": 120, "will_do": 103, "skipped": 17 }
@@ -375,7 +379,8 @@ sequenceDiagram
 | `main.go` | ABI 方法分发、插件注册、管理路由（credentials / preview / plan / settings / apply / stop / status）与资源页 |
 | `cgo_bridge.go` / `host.go` / `host_gate.go` | CGO 桥接、信封编解码、宿主调用并发上限控制（同时最多 16 个回调，防止宿主响应慢时线程堆积） |
 | `render.go` | 占位符解析（自定义优先、内置兜底）、点路径取值、模板与 URL 校验（哑值替换后校验） |
-| `credentials.go` | 共享筛选、分页参数与页切片、按路径直读认证文件（host.auth.get 兜底）、批次目标解析 |
+| credentials.go | OAuth 文件与 API Key 清单合并、共享筛选、分页参数与页切片、按路径直读认证文件（host.auth.get 兜底）、批次目标解析 |
+| pi_keys.go | API Key 身份摘要、v8 配置读取、组/Key 展开、组/Key 代理继承、ETag 写回 |
 | `mgmt.go` | 回环管理 API 客户端：密钥三级解析、回环 TLS 跳过校验、http/https 切换重试、PATCH fields |
 | `config.go` | config.json 原子写入、校验规则、快照 |
 | `engine.go` | 批次互斥、并发执行、协作停止、进度快照 |
@@ -393,3 +398,82 @@ sequenceDiagram
 - 密钥链路：面板存储提取密钥可用；收到 401 后会自动重新提取密钥并重试一次。
 - 回环基址：本地 http 回环实测通过；生产实例的批量写入功能已通过用户的功能测试确认可用。
 - 用户确认全部功能测试通过，产物为 `cpa-proxy-manager-v0.2.2.dll`。
+
+---
+
+## E. API Key 扩展（v0.4.0）
+
+### E.1 目标与数据源
+
+在原有 OAuth 认证文件之外，支持 CPA `config.yaml` 中 `api-keys` 配置的 API Key。插件通过 CPA v8 Management API 读取：
+
+```text
+GET /v8/management/config/api-keys/<provider>
+```
+
+支持的提供商族与 CPA v8 配置族一致：
+
+```text
+gemini, interactions, vertex, codex, claude, xai, meta, openai-compatibility
+```
+
+响应中的 `groups[].keys[]` 被展开为逐 Key 的凭据行。`openai-compatibility` 保留组名称并显示为 `openai-compatibility/<group>`。`auth_index` / `auth-index` 是读取接口注入的运行时字段，写回前会从组和 Key 中移除。
+
+### E.2 身份、占位符与选择
+
+API Key 身份使用固定顺序的规范元组：
+
+```text
+["api_key", source, provider, name, base-url, prefix, api-key]
+```
+
+元组以 JSON 数组编码为 UTF-8 字节，计算 SHA-256 后使用 64 位小写十六进制摘要。完整摘要用于内部目标定位和 `$.sha256`；`{account}` 与 `$.account` 使用前 8 位。完全相同的重复元组通过 `occurrence` 区分。前端使用 `target_id` 选择目标，不再把 `auth_index` 当作统一选择键。
+
+API Key 的安全占位符上下文为：
+
+```text
+$.sha256, $.account, $.provider, $.name, $.base-url, $.prefix, $.source
+```
+
+用户在模板管理中新增名称为 `sha256`、路径为 `$.sha256` 的自定义占位符后，可渲染 `{sha256}`。`$.name` 取配置组名称，不包含用于展示的 Key 序号后缀。
+
+### E.3 写入与清空
+
+- 设置：向目标 Key 写入 `proxy-url`
+- 清空：删除目标 Key 的 `proxy-url`，回退到组级代理，再回退到全局代理
+- 只有组级代理、没有 Key 级覆盖的行不计入清空目标
+- 同一提供商族的所有目标 Key 合并为一次配置写入，避免同一配置并发 `PATCH`
+- 写入前读取 ETag，`PATCH` 携带 `If-Match`；412 时重新读取并重试最多 3 次
+- 目标缺失或配置变化时返回失败，不写入过期目标
+
+v8 `PATCH` 对列表采用整组替换，因此对应提供商配置列表中的 YAML 注释可能丢失。这是换取 ETag 并发保护与稳定写回的已知代价。
+
+### E.4 安全边界
+
+- 原始 API Key 只在插件进程内用于计算身份和构造配置写回
+- 不写入插件 `config.json`，不进入 `CredentialView`，不返回浏览器，不写日志
+- 浏览器只接收代理地址、摘要前 8 位、组名称、提供商与代理来源等非敏感字段
+- 文件型 API Key 在能派生出摘要时同样替换为安全占位符上下文
+- v8 管理 API 的非 2xx 错误只向前端暴露状态码，不拼接响应正文，避免错误响应回显密钥
+
+### E.5 前端与接口变化
+
+- `/credentials`、`/preview`、`/plan`、`/apply` 共享同一套 `kind` 筛选（`oauth` / `api_key`）和 `target_id` 选择
+- 表格增加 OAuth / API Key 类型列与代理来源标签：`key`、`group`、`global`、`credential`
+- 预览、计划与执行仍由后端同一渲染函数生成，前端不复制占位符规则
+- 写入进度仍按 Key 计数；同一提供商族的多个 Key 共享一次配置写入结果，单元失败时该单元内所有 Key 均记为失败
+
+### E.6 验证
+
+新增单元测试覆盖：
+
+- 身份元组稳定性、固定摘要向量与字段敏感性
+- 重复 Key 的 occurrence 定位
+- 组级 / Key 级代理继承
+- 安全上下文不包含原始 API Key
+- ETag / If-Match 写入与无关配置字段保留
+- 管理 API 错误不泄露响应正文中的密钥
+- 文件型 API Key 的类型筛选与安全上下文
+- 同一提供商多个 Key 合并为一次写入
+
+vendored SDK 更新至 `router-for-me/CLIProxyAPI` 提交 `fa11a573b252b30256bef4de952a95feee3c8c9d`，并已通过 `go test ./...` 与 CGO `c-shared` 构建验证。

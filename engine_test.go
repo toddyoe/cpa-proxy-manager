@@ -13,7 +13,11 @@ import (
 func resetEngine(t *testing.T) {
 	t.Helper()
 	origPatch := patchProxyURLFn
-	t.Cleanup(func() { patchProxyURLFn = origPatch })
+	origAPIKeyPatch := patchAPIKeyTargetsFn
+	t.Cleanup(func() {
+		patchProxyURLFn = origPatch
+		patchAPIKeyTargetsFn = origAPIKeyPatch
+	})
 	engine.mu.Lock()
 	engine.running = false
 	engine.stopped = false
@@ -119,4 +123,29 @@ func waitEngineIdle(t *testing.T, timeout time.Duration) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("engine did not finish in time")
+}
+
+func TestAPIKeyTargetsForSameProviderUseOneWrite(t *testing.T) {
+	resetEngine(t)
+	var calls atomic.Int32
+	var groupedKeys atomic.Int32
+	patchAPIKeyTargetsFn = func(ctx context.Context, targets []EngineTarget, headers http.Header) error {
+		calls.Add(1)
+		groupedKeys.Add(int32(len(targets)))
+		return nil
+	}
+	targets := []EngineTarget{
+		{Kind: targetKindAPIKeyConfig, Label: "key-one", Value: "http://one:8080", APIKey: &APIKeyTarget{ProviderFamily: "claude", FullHash: "a", Occurrence: 0}},
+		{Kind: targetKindAPIKeyConfig, Label: "key-two", Value: "http://two:8080", APIKey: &APIKeyTarget{ProviderFamily: "claude", FullHash: "b", Occurrence: 0}},
+	}
+	if err := engine.Start("set", targets, 4, nil); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	waitEngineIdle(t, 2*time.Second)
+	if calls.Load() != 1 || groupedKeys.Load() != 2 {
+		t.Fatalf("calls=%d keys=%d, want one write with two keys", calls.Load(), groupedKeys.Load())
+	}
+	if snap := engine.Snapshot(); snap.OK != 2 || snap.Failed != 0 {
+		t.Fatalf("snapshot = %+v", snap)
+	}
 }

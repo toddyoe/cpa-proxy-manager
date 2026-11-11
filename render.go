@@ -104,6 +104,9 @@ func placeholderValue(name string, phs []Placeholder, cred *Credential) (string,
 	}
 	switch name {
 	case builtinAccount:
+		if strings.TrimSpace(cred.Account) != "" {
+			return cred.Account, true
+		}
 		if cred.Email == "" {
 			return "", false
 		}
