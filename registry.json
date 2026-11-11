@@ -6,7 +6,7 @@
       "name": "代理批量设置",
       "description": "按模板与占位符批量设置、清空 CPA 凭据的代理地址",
       "author": "toddyoe",
-      "version": "0.3.1",
+      "version": "0.4.0",
       "repository": "https://github.com/toddyoe/cpa-proxy-manager",
       "homepage": "https://github.com/toddyoe/cpa-proxy-manager#readme",
       "tags": [
@@ -20,37 +20,37 @@
           {
             "goos": "darwin",
             "goarch": "amd64",
-            "url": "https://github.com/toddyoe/cpa-proxy-manager/releases/download/v0.3.1/cpa-proxy-manager_0.3.1_darwin_amd64.zip",
-            "sha256": "c8d40505abadbf0cb7c33c3cf1d927066a414675eff23e5a9ef6e89d45af2014",
-            "size": 2459731
+            "url": "https://github.com/toddyoe/cpa-proxy-manager/releases/download/v0.4.0/cpa-proxy-manager_0.4.0_darwin_amd64.zip",
+            "sha256": "9bfac63c919f90f62fc8817cab3ae89ae2db82bb6c1d263aaf83cbcd7785591b",
+            "size": 2486072
           },
           {
             "goos": "darwin",
             "goarch": "arm64",
-            "url": "https://github.com/toddyoe/cpa-proxy-manager/releases/download/v0.3.1/cpa-proxy-manager_0.3.1_darwin_arm64.zip",
-            "sha256": "dd2051ff8baf5c4c58a5ba995a4a0bc2f9e2ad31992876cc8f002a3dc83d0dde",
-            "size": 2310729
+            "url": "https://github.com/toddyoe/cpa-proxy-manager/releases/download/v0.4.0/cpa-proxy-manager_0.4.0_darwin_arm64.zip",
+            "sha256": "4d18316fe4f5a03b9656ea3dcca69e011dcc799e13841f013a2f3537df80ed7b",
+            "size": 2333283
           },
           {
             "goos": "linux",
             "goarch": "amd64",
-            "url": "https://github.com/toddyoe/cpa-proxy-manager/releases/download/v0.3.1/cpa-proxy-manager_0.3.1_linux_amd64.zip",
-            "sha256": "6fa3b75d4862422a3b3a3a03dc97d9c21e882214444720a306b4357a5166a644",
-            "size": 4469026
+            "url": "https://github.com/toddyoe/cpa-proxy-manager/releases/download/v0.4.0/cpa-proxy-manager_0.4.0_linux_amd64.zip",
+            "sha256": "055f9e5d0847f5581f0000b17af4106daca7a1ca50a5e898c4ba6a2fd9782e00",
+            "size": 4510261
           },
           {
             "goos": "linux",
             "goarch": "arm64",
-            "url": "https://github.com/toddyoe/cpa-proxy-manager/releases/download/v0.3.1/cpa-proxy-manager_0.3.1_linux_arm64.zip",
-            "sha256": "0ad1451abb7b69a21904bf83300f42e46b068d3cb44d9fa953768dce593a94c9",
-            "size": 4141009
+            "url": "https://github.com/toddyoe/cpa-proxy-manager/releases/download/v0.4.0/cpa-proxy-manager_0.4.0_linux_arm64.zip",
+            "sha256": "f5ea4c9ca75fde151433a5483b24b17f19f97415d404a0b4414b7e48c2cccc15",
+            "size": 4179139
           },
           {
             "goos": "windows",
             "goarch": "amd64",
-            "url": "https://github.com/toddyoe/cpa-proxy-manager/releases/download/v0.3.1/cpa-proxy-manager_0.3.1_windows_amd64.zip",
-            "sha256": "607c1f7e4d59e2a359cb1f8f0a34142b5c2cb580fb55ef4890f12fa7af5e62d7",
-            "size": 4386250
+            "url": "https://github.com/toddyoe/cpa-proxy-manager/releases/download/v0.4.0/cpa-proxy-manager_0.4.0_windows_amd64.zip",
+            "sha256": "7feb879bac3d868000ca7ae550e9053336c98db3b86a84429d4bee64337209c2",
+            "size": 4427481
           }
         ]
       }
